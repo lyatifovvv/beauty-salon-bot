@@ -44,3 +44,13 @@ bot.catch((err) => {
 // Запуск бота
 console.log('Бот салона красоты Sebastian успешно запущен...');
 bot.start();
+
+// Создаем фиктивный HTTP-сервер для успешного прохождения проверок (health checks) на бесплатных облачных хостингах вроде Render.com (Web Service)
+import http from 'http';
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Sebastian Beauty Salon Bot is running!');
+}).listen(PORT, () => {
+  console.log(`Dummy HTTP server is listening on port ${PORT} to keep Render happy.`);
+});
