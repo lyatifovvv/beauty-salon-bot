@@ -1,0 +1,98 @@
+# ============================================
+# СЕКРЕТЫ — НИКОГДА НЕ КОММИТЯТСЯ
+# ============================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.pem
+*.key
+*.p12
+*.pfx
+.beget-credentials*
+secrets/
+
+# ============================================
+# ЛОГИ
+# ============================================
+*.log
+logs/
+deploy.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================
+# NODE / JAVASCRIPT
+# ============================================
+node_modules/
+.npm
+.yarn/
+.pnp.*
+.next/
+.nuxt/
+.svelte-kit/
+.turbo/
+dist/
+build/
+out/
+.cache/
+*.tsbuildinfo
+
+# ============================================
+# PYTHON
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ============================================
+# IDE / РЕДАКТОРЫ
+# ============================================
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================
+# CLAUDE CODE
+# ============================================
+.claude/local/
+.claude/cache/
+
+# ============================================
+# БАЗА ДАННЫХ (локальная)
+# ============================================
+*.sqlite
+*.sqlite3
+*.db
+dumps/
+backups/
+
+# ============================================
+# ВРЕМЕННЫЕ ФАЙЛЫ
+# ============================================
+tmp/
+temp/
+.tmp/
+*.bak
+*.tmp

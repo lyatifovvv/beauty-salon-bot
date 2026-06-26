@@ -1,0 +1,89 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Service {
+  id              String        @id @default(uuid())
+  name            String
+  durationMinutes Int
+  priceRub        Int
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  appointments    Appointment[]
+  masters         Master[]      @relation("MasterServices")
+}
+
+model Master {
+  id           String        @id @default(uuid())
+  name         String
+  photoUrl     String?
+  workingHours String        // Хранит расписание по дням недели как JSON-строку
+  vacationFrom DateTime?
+  vacationTo   DateTime?
+  isActive     Boolean       @default(true)
+  services     Service[]     @relation("MasterServices")
+  appointments Appointment[]
+  portfolioItems PortfolioItem[]
+}
+
+model Client {
+  id           String        @id @default(uuid())
+  telegramId   BigInt        @unique // BigInt для Telegram ID
+  name         String
+  phone        String
+  createdAt    DateTime      @default(now())
+  isBlocked    Boolean       @default(false)
+  appointments Appointment[]
+}
+
+model Appointment {
+  id               String            @id @default(uuid())
+  clientId         String
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  masterId         String
+  master           Master            @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  serviceId        String
+  service          Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  startsAt         DateTime          // Время начала визита
+  endsAt           DateTime          // Время окончания
+  priceRubSnapshot Int               // Цена на момент записи
+  status           String            @default("confirmed") // confirmed, cancelled_by_client, cancelled_by_admin, completed, no_show
+  feedbackRating   Int?              // Оценка отзыва (1..5)
+  feedbackText     String?           // Текст отзыва
+  createdAt        DateTime          @default(now())
+  cancelledAt      DateTime?
+  cancelReason     String?
+  notifications    Notification[]
+}
+
+model Notification {
+  id            String             @id @default(uuid())
+  appointmentId String
+  appointment   Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  type          String             // reminder_24h, reminder_2h, feedback_request
+  scheduledAt   DateTime
+  sentAt        DateTime?
+  status        String             @default("pending") // pending, sent, cancelled, failed
+}
+
+model AdminSession {
+  telegramId      BigInt   @id
+  authenticatedAt DateTime @default(now())
+  expiresAt       DateTime
+}
+
+model PortfolioItem {
+  id          String   @id @default(uuid())
+  fileId      String
+  mediaType   String   // 'photo' или 'video'
+  groupId     String?  // ID для группировки медиа (MediaGroup)
+  description String?
+  masterId    String?
+  master      Master?  @relation(fields: [masterId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+}

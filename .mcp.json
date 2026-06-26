@@ -1,0 +1,36 @@
+{
+  "_comment": "MCP-серверы для курса. context7 даёт Claude актуальную доку, shadcn — компоненты, playwright — тесты. github подключи когда заведёшь репозиторий. Постгрес MCP в курсе не используем — работаем через код.",
+  "mcpServers": {
+    "context7": {
+      "_comment": "Свежая документация любых библиотек. Пиши 'use context7' в запросе и Claude получит актуальные доки Next.js / Tailwind / shadcn / Drizzle и т.д.",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "shadcn": {
+      "_comment": "Установка и preview shadcn-компонентов. Включается автоматически когда работаем с дизайном.",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"]
+    },
+    "playwright": {
+      "_comment": "Браузерные тесты через accessibility tree (дёшево по токенам). Включай когда нужны e2e-тесты.",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--isolated", "--headless"]
+    },
+    "chrome-devtools": {
+      "_comment": "Performance / Lighthouse. Включай для оптимизации сайта.",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--no-usage-statistics"]
+    },
+    "github": {
+      "_comment": "Работа с GitHub repo. Подключи когда заведёшь репозиторий. Токен с правами repo:write только на учебный репозиторий.",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@github/github-mcp-server"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+    }
+  }
+}
