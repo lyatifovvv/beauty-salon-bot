@@ -73,22 +73,26 @@ export async function renderBookingDates(ctx: MyContext, masterId: string, servi
   const keyboard = new InlineKeyboard();
   let buttonsAdded = 0;
 
-  for (let i = 0; i < 14; i++) {
-    const date = addDays(localNow, i);
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dateLabel = format(date, 'd MMM (EEE)', { locale: ru });
-    
-    let hasSlots = false;
-    if (masterId !== 'any') {
-      const slots = await getAvailableSlots(masterId, serviceId, dateStr);
-      hasSlots = slots.length > 0;
-    } else {
-      const service = await prisma.service.findUnique({
-        where: { id: serviceId },
-        include: { masters: { where: { isActive: true } } }
-      });
-      if (service) {
-        for (const m of service.masters) {
+  let serviceWithMasters: any = null;
+  if (masterId === 'any') {
+    serviceWithMasters = await prisma.service.findUnique({
+      where: { id: serviceId },
+      include: { masters: { where: { isActive: true } } }
+    });
+  }
+
+  const datesData = await Promise.all(
+    Array.from({ length: 14 }).map(async (_, i) => {
+      const date = addDays(localNow, i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dateLabel = format(date, 'd MMM (EEE)', { locale: ru });
+      let hasSlots = false;
+
+      if (masterId !== 'any') {
+        const slots = await getAvailableSlots(masterId, serviceId, dateStr);
+        hasSlots = slots.length > 0;
+      } else if (serviceWithMasters) {
+        for (const m of serviceWithMasters.masters) {
           const slots = await getAvailableSlots(m.id, serviceId, dateStr);
           if (slots.length > 0) {
             hasSlots = true;
@@ -96,10 +100,14 @@ export async function renderBookingDates(ctx: MyContext, masterId: string, servi
           }
         }
       }
-    }
 
-    if (hasSlots) {
-      keyboard.text(dateLabel, `book_date:${dateStr}`);
+      return { dateStr, dateLabel, hasSlots };
+    })
+  );
+
+  for (const data of datesData) {
+    if (data.hasSlots) {
+      keyboard.text(data.dateLabel, `book_date:${data.dateStr}`);
       buttonsAdded++;
       if (buttonsAdded % 2 === 0) keyboard.row();
     }

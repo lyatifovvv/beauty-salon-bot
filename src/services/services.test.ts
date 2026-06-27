@@ -342,9 +342,9 @@ describe('Сервис портфолио (portfolioService)', () => {
     await expect(deletePortfolioItem('invalid')).rejects.toThrow('Работа не найдена');
   });
 
-  test('listPortfolioItems должен запрашивать список с лимитом 10', async () => {
+  test('listPortfolioItems должен запрашивать список с лимитом 100', async () => {
     prisma.portfolioItem.findMany.mockResolvedValue([
-      { id: 'port-1', fileId: 'file-1', mediaType: 'photo' }
+      { id: 'port-1', fileId: 'file-1', mediaType: 'photo', createdAt: new Date() }
     ]);
 
     const result = await listPortfolioItems();
@@ -358,9 +358,7 @@ describe('Сервис портфолио (portfolioService)', () => {
           }
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      },
+      orderBy: { createdAt: 'desc' },
       take: 100
     });
     expect(result).toHaveLength(1);

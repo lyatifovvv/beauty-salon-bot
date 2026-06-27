@@ -423,6 +423,18 @@ export async function getAvailableSlots(
   const localNow = getLocalNow();
   const minBookingTime = addHours(localNow, BOOKING_LEAD_HOURS);
 
+  const dayStartUtc = fromZonedTime(currentLocal, TIMEZONE);
+  const dayEndUtc = fromZonedTime(endLocal, TIMEZONE);
+
+  const existingAppointments = await prisma.appointment.findMany({
+    where: {
+      masterId: master.id,
+      status: 'confirmed',
+      startsAt: { lt: dayEndUtc },
+      endsAt: { gt: dayStartUtc }
+    }
+  });
+
   while (isBefore(currentLocal, endLocal)) {
     const slotEnds = addMinutes(currentLocal, service.durationMinutes);
     if (isAfter(slotEnds, endLocal)) {
@@ -433,16 +445,12 @@ export async function getAvailableSlots(
       const startsAtUtc = fromZonedTime(currentLocal, TIMEZONE);
       const endsAtUtc = fromZonedTime(slotEnds, TIMEZONE);
 
-      const overlapping = await prisma.appointment.findFirst({
-        where: {
-          masterId: master.id,
-          status: 'confirmed',
-          OR: [
-            { startsAt: { lte: startsAtUtc }, endsAt: { gt: startsAtUtc } },
-            { startsAt: { lt: endsAtUtc }, endsAt: { gte: endsAtUtc } },
-            { startsAt: { gte: startsAtUtc }, endsAt: { lte: endsAtUtc } }
-          ]
-        }
+      const overlapping = existingAppointments.some(app => {
+        return (
+          (app.startsAt <= startsAtUtc && app.endsAt > startsAtUtc) ||
+          (app.startsAt < endsAtUtc && app.endsAt >= endsAtUtc) ||
+          (app.startsAt >= startsAtUtc && app.endsAt <= endsAtUtc)
+        );
       });
 
       if (!overlapping) {
