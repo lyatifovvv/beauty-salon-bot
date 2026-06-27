@@ -5,6 +5,8 @@ import { getAdminMenuKeyboard } from '../../keyboards/adminKeyboards';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import { config } from '../../core/config';
+import { getSalonConfig } from '../../services/salonService';
+import { escapeMarkdown } from '../../utils/formatters';
 
 const prisma = new PrismaClient();
 export const adminAuthComposer = new Composer<MyContext>();
@@ -17,7 +19,9 @@ adminAuthComposer.command('admin', async (ctx) => {
   await deletePreviousPrompt(ctx);
   const authorized = await isAdmin(tgId);
   if (authorized) {
-    await ctx.reply('🔑 *Панель администратора Sebastian* приветствует вас!', {
+    const salonConfig = getSalonConfig();
+    const salonName = escapeMarkdown(salonConfig.name);
+    await ctx.reply(`🔑 *Панель администратора ${salonName}* приветствует вас!`, {
       parse_mode: 'Markdown',
       reply_markup: getAdminMenuKeyboard()
     });

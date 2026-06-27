@@ -4,6 +4,9 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { toZonedTime } from 'date-fns-tz';
 
+import { getSalonConfig } from './salonService';
+import { escapeMarkdown } from '../utils/formatters';
+
 const prisma = new PrismaClient();
 const TIMEZONE = 'Europe/Moscow';
 
@@ -101,8 +104,11 @@ async function processPendingNotifications(bot: Bot<any>) {
           data: { status: 'completed' }
         });
 
+        const salonConfig = getSalonConfig();
+        const salonName = escapeMarkdown(salonConfig.name);
+
         const text = 
-          `💝 *Спасибо за визит в Sebastian!*\n\n` +
+          `💝 *Спасибо за визит в ${salonName}!*\n\n` +
           `Тебе понравилась услуга *${appointment.service.name}* у мастера *${appointment.master.name}*?\n\n` +
           `Пожалуйста, оцени качество работы мастера от 1 до 5 звёзд:`;
 
