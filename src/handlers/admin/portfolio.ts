@@ -18,6 +18,13 @@ const mediaGroupCollectors = new Map<string, {
   timer: NodeJS.Timeout;
 }>();
 
+// Временное хранилище данных для добавления портфолио в рамках текущей сессии админа
+const adminPortfolioTempData = new Map<number, {
+  media: { fileId: string; mediaType: 'photo' | 'video' }[];
+  description?: string;
+  promptMessageId?: number;
+}>();
+
 // Обработчик текстового ввода для портфолио
 adminPortfolioComposer.on('message:text', async (ctx, next) => {
   const tgId = ctx.from?.id;
@@ -31,12 +38,18 @@ adminPortfolioComposer.on('message:text', async (ctx, next) => {
   if (ctx.session.step === 'admin_add_portfolio_desc') {
     const desc = ctx.message.text.trim();
     await deleteAdminInputMessage(ctx);
-    await deletePreviousPrompt(ctx);
+    
+    // Удаляем предыдущую подсказку бота
+    const tempData = adminPortfolioTempData.get(tgId);
+    if (tempData?.promptMessageId) {
+      try { await ctx.api.deleteMessage(ctx.chat!.id, tempData.promptMessageId); } catch (e) {}
+    } else if (ctx.session.adminState?.promptMessageId) {
+      try { await ctx.api.deleteMessage(ctx.chat!.id, ctx.session.adminState.promptMessageId); } catch (e) {}
+    }
 
-    if (!ctx.session.adminState) ctx.session.adminState = {};
-    if (!ctx.session.adminState.newPortfolioForm) ctx.session.adminState.newPortfolioForm = {};
-
-    ctx.session.adminState.newPortfolioForm.description = desc === '-' ? undefined : desc;
+    if (tempData) {
+      tempData.description = desc === '-' ? undefined : desc;
+    }
 
     const masters = await listMasters(false);
     const keyboard = new InlineKeyboard();
@@ -46,10 +59,17 @@ adminPortfolioComposer.on('message:text', async (ctx, next) => {
     keyboard.text('🧑‍🎨 Без привязки к мастеру', 'adm_port_set_m:none').row();
     keyboard.text('❌ Отмена', 'admin_portfolio');
 
-    const msg = await ctx.reply('🧑‍🎨 Выберите мастера, чья это работа:', {
+    const msg = await ctx.reply('⚙️ *[Добавление работы]*\n\n🧑‍🎨 Выберите мастера, к которому относится эта работа (или нажмите "Без привязки"):', {
+      parse_mode: 'Markdown',
       reply_markup: keyboard
     });
-    ctx.session.adminState.promptMessageId = msg.message_id;
+    
+    if (tempData) {
+      tempData.promptMessageId = msg.message_id;
+    } else {
+      ctx.session.adminState = ctx.session.adminState || {};
+      ctx.session.adminState.promptMessageId = msg.message_id;
+    }
     return;
   }
 
@@ -83,8 +103,8 @@ adminPortfolioComposer.on(['message:photo', 'message:video'], async (ctx, next) 
 
     const mediaGroupId = ctx.message.media_group_id;
 
-    ctx.session.adminState = ctx.session.adminState || {};
-    const adminState = ctx.session.adminState;
+    // Сразу меняем шаг сессии на описание, чтобы он сохранился в базе данных сессий синхронно!
+    ctx.session.step = 'admin_add_portfolio_desc';
 
     if (mediaGroupId) {
       let collector = mediaGroupCollectors.get(mediaGroupId);
@@ -92,12 +112,22 @@ adminPortfolioComposer.on(['message:photo', 'message:video'], async (ctx, next) 
         collector = { media: [], timer: null as any };
         mediaGroupCollectors.set(mediaGroupId, collector);
 
+        // Инициализируем пустую запись в глобальном хранилище, чтобы не потерять promptMessageId
+        adminPortfolioTempData.set(tgId, { media: [] });
+
         collector.timer = setTimeout(async () => {
           mediaGroupCollectors.delete(mediaGroupId);
-          await deletePreviousPrompt(ctx);
+          
+          // Удаляем предыдущую подсказку админа
+          const tempData = adminPortfolioTempData.get(tgId);
+          if (tempData?.promptMessageId) {
+            try { await ctx.api.deleteMessage(ctx.chat!.id, tempData.promptMessageId); } catch (e) {}
+          } else if (ctx.session.adminState?.promptMessageId) {
+            try { await ctx.api.deleteMessage(ctx.chat!.id, ctx.session.adminState.promptMessageId); } catch (e) {}
+          }
 
-          adminState.newPortfolioMediaBatch = collector!.media;
-          ctx.session.step = 'admin_add_portfolio_desc';
+          // Сохраняем собранные медиа в глобальное временное хранилище
+          adminPortfolioTempData.set(tgId, { media: collector!.media });
 
           const kb = new InlineKeyboard().text('❌ Отмена', 'admin_portfolio');
           const msg = await ctx.api.sendMessage(
@@ -108,26 +138,41 @@ adminPortfolioComposer.on(['message:photo', 'message:video'], async (ctx, next) 
               reply_markup: kb
             }
           );
-          adminState.promptMessageId = msg.message_id;
+          
+          const updatedTempData = adminPortfolioTempData.get(tgId);
+          if (updatedTempData) {
+            updatedTempData.promptMessageId = msg.message_id;
+          }
         }, 800);
       }
       collector.media.push({ fileId, mediaType });
     } else {
-      await deletePreviousPrompt(ctx);
-      adminState.newPortfolioMediaBatch = [{ fileId, mediaType }];
-      ctx.session.step = 'admin_add_portfolio_desc';
+      // Удаляем предыдущую подсказку админа
+      const tempData = adminPortfolioTempData.get(tgId);
+      if (tempData?.promptMessageId) {
+        try { await ctx.api.deleteMessage(ctx.chat!.id, tempData.promptMessageId); } catch (e) {}
+      } else if (ctx.session.adminState?.promptMessageId) {
+        try { await ctx.api.deleteMessage(ctx.chat!.id, ctx.session.adminState.promptMessageId); } catch (e) {}
+      }
+
+      adminPortfolioTempData.set(tgId, { media: [{ fileId, mediaType }] });
 
       const kb = new InlineKeyboard().text('❌ Отмена', 'admin_portfolio');
       const msg = await ctx.reply('✍️ Введите описание работы (или отправьте `-` для пропуска):', {
         reply_markup: kb
       });
-      adminState.promptMessageId = msg.message_id;
+      
+      const updatedTempData = adminPortfolioTempData.get(tgId);
+      if (updatedTempData) {
+        updatedTempData.promptMessageId = msg.message_id;
+      }
     }
     return;
   }
 
   await next();
 });
+
 
 // Callbacks
 adminPortfolioComposer.callbackQuery('admin_portfolio', async (ctx) => {
@@ -138,6 +183,7 @@ adminPortfolioComposer.callbackQuery('admin_portfolio', async (ctx) => {
 
   ctx.session.step = 'idle';
   ctx.session.adminState = {};
+  adminPortfolioTempData.delete(ctx.from.id);
 
   const items = await listPortfolioItems();
   const keyboard = new InlineKeyboard();
@@ -255,14 +301,22 @@ adminPortfolioComposer.callbackQuery('adm_port_add', async (ctx) => {
   await deletePreviousPrompt(ctx);
 
   ctx.session.step = 'admin_add_portfolio_media';
-  ctx.session.adminState = { newPortfolioForm: {} };
+  ctx.session.adminState = {};
+  adminPortfolioTempData.set(ctx.from.id, { media: [] });
 
   const kb = new InlineKeyboard().text('❌ Отмена', 'admin_portfolio');
   const msg = await ctx.reply('🖼️ *Отправьте одно или несколько фото/видео* для портфолио:', {
     parse_mode: 'Markdown',
     reply_markup: kb
   });
-  ctx.session.adminState.promptMessageId = msg.message_id;
+  
+  const tempData = adminPortfolioTempData.get(ctx.from.id);
+  if (tempData) {
+    tempData.promptMessageId = msg.message_id;
+  } else {
+    ctx.session.adminState = ctx.session.adminState || {};
+    ctx.session.adminState.promptMessageId = msg.message_id;
+  }
 });
 
 adminPortfolioComposer.callbackQuery(/^adm_port_set_m:(.+)$/, async (ctx) => {
@@ -272,12 +326,14 @@ adminPortfolioComposer.callbackQuery(/^adm_port_set_m:(.+)$/, async (ctx) => {
   await deletePreviousPrompt(ctx);
 
   const masterIdChoice = ctx.match[1];
-  const mediaBatch = ctx.session.adminState?.newPortfolioMediaBatch;
-  const form = ctx.session.adminState?.newPortfolioForm;
+  const tempData = adminPortfolioTempData.get(ctx.from.id);
+  const mediaBatch = tempData?.media;
+  const description = tempData?.description;
 
   if (!mediaBatch || mediaBatch.length === 0) {
     ctx.session.step = 'idle';
-    await ctx.reply('Ошибка сессии. Начните добавление заново.', {
+    adminPortfolioTempData.delete(ctx.from.id);
+    await ctx.reply('Ошибка сессии или данные устарели. Начните добавление заново.', {
       reply_markup: getAdminMenuKeyboard()
     });
     return;
@@ -287,7 +343,7 @@ adminPortfolioComposer.callbackQuery(/^adm_port_set_m:(.+)$/, async (ctx) => {
   const batchSize = mediaBatch.length;
 
   try {
-    const { canAdd, count, limit } = await checkPortfolioLimit(masterId);
+    const { canAdd, count, limit } = await checkPortfolioLimit(masterId, batchSize);
     if (!canAdd) {
       const nameText = masterId ? 'мастера' : 'общих работ';
       await ctx.reply(
@@ -307,17 +363,20 @@ adminPortfolioComposer.callbackQuery(/^adm_port_set_m:(.+)$/, async (ctx) => {
     const groupId = batchSize > 1 ? randomUUID() : undefined;
 
     for (const item of mediaBatch) {
-      await addPortfolioItem(item.fileId, item.mediaType, form?.description, masterId, groupId);
+      await addPortfolioItem(item.fileId, item.mediaType, description, masterId, groupId);
     }
 
     ctx.session.step = 'idle';
     ctx.session.adminState = {};
+    adminPortfolioTempData.delete(ctx.from.id);
+
     await ctx.reply(`✅ Успешно добавлено работ в портфолио: *${batchSize}*!`, {
       parse_mode: 'Markdown',
       reply_markup: new InlineKeyboard().text('⬅️ В портфолио', 'admin_portfolio')
     });
   } catch (err: any) {
     ctx.session.step = 'idle';
+    adminPortfolioTempData.delete(ctx.from.id);
     await ctx.reply(`Ошибка при сохранении: ${err.message}`, {
       reply_markup: new InlineKeyboard().text('⬅️ В портфолио', 'admin_portfolio')
     });
