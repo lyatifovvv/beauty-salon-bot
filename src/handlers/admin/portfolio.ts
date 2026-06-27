@@ -51,6 +51,8 @@ adminPortfolioComposer.on('message:text', async (ctx, next) => {
       tempData.description = desc === '-' ? undefined : desc;
     }
 
+    ctx.session.step = 'admin_add_portfolio_master';
+
     const masters = await listMasters(false);
     const keyboard = new InlineKeyboard();
     for (const m of masters) {
@@ -86,7 +88,7 @@ adminPortfolioComposer.on(['message:photo', 'message:video'], async (ctx, next) 
     return next();
   }
 
-  if (ctx.session.step === 'admin_add_portfolio_media') {
+  if (ctx.session.step === 'admin_add_portfolio_media' || ctx.session.step === 'admin_add_portfolio_desc') {
     await deleteAdminInputMessage(ctx);
 
     let fileId = '';

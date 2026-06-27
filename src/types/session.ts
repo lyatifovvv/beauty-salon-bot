@@ -19,7 +19,8 @@ export interface SessionData {
     | 'client_edit_lastname'
     | 'client_edit_phone'
     | 'admin_add_portfolio_media'
-    | 'admin_add_portfolio_desc';
+    | 'admin_add_portfolio_desc'
+    | 'admin_add_portfolio_master';
   booking?: {
     serviceId?: string;
     masterId?: string;
